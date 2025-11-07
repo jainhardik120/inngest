@@ -80,7 +80,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		})
 	}()
 
-	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts())
+	jID := queue.JobIDFromContext(ctx)
+
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID)
 	if err != nil {
 		return nil, err
 	}
@@ -175,9 +177,14 @@ func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grp
 		span.RecordError(err)
 
 		syscodeError := &syscode.Error{}
-		if errors.As(err, &syscodeError) {
+		if errors.As(err, &syscodeError) || errors.As(err, syscodeError) {
 			sysErr = syscodeError
 		}
+	}
+
+	// check for connect worker capacity errors
+	if sysErr != nil && (sysErr.Code == syscode.CodeConnectAllWorkersAtCapacity || sysErr.Code == syscode.CodeConnectRequestAssignWorkerReachedCapacity) {
+		return nil, state.ErrConnectWorkerCapacity
 	}
 
 	if resp == nil && err != nil {

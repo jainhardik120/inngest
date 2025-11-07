@@ -312,6 +312,7 @@ LOOP:
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
+				l.Warn("all workers busy, early exiting scan", "worker_capacity", q.capacity())
 				continue
 			}
 
@@ -620,13 +621,11 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
-	if len(partitions) > 0 {
-		q.log.Trace("processing partitions",
-			"partition_key", partitionKey,
-			"peek_until", peekUntil.Format(time.StampMilli),
-			"partition", len(partitions),
-		)
-	}
+	q.log.Trace("processing partitions",
+		"partition_key", partitionKey,
+		"peek_until", peekUntil.Format(time.StampMilli),
+		"partition", len(partitions),
+	)
 
 	eg := errgroup.Group{}
 
@@ -713,6 +712,7 @@ func (q *queue) scan(ctx context.Context) error {
 		}
 
 		if len(peekedAccounts) == 0 {
+			q.log.Trace("account_peek yielded no accounts")
 			return nil
 		}
 
@@ -1217,6 +1217,10 @@ func (q *queue) process(
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
+	//
+	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
+	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
+	jobCtx = osqueue.WithShardID(jobCtx, q.primaryQueueShard.Name)
 	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {
@@ -1607,9 +1611,14 @@ func durationWithTags[T any](ctx context.Context, queueShardName string, op stri
 	}
 
 	res, err := f(ctx)
+
+	d := time.Since(start)
+	if d > time.Second {
+		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d)
+	}
 	metrics.HistogramQueueOperationDuration(
 		ctx,
-		time.Since(start).Milliseconds(),
+		d.Milliseconds(),
 		metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    finalTags,

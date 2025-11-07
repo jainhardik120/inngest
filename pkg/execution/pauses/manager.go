@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
@@ -212,7 +213,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 	// If this is larger than the max buffer len, schedule a new block write.  We only
 	// enqueue this job once per index ID, using queue singletons to handle these.
 	if n >= m.bs.BlockSize() {
-		if err := m.flusher.Enqueue(ctx, index); err != nil {
+		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, redis_state.ErrQueueItemExists) {
 			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
 		}
 	}
@@ -283,6 +284,12 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 	), nil
 }
 
+// PausesSinceWithCreatedAt loads up to limit pauses for a given index since a given time,
+// ordered by creation time, with createdAt populated from Redis sorted set scores.
+func (m manager) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	return m.buf.PausesSinceWithCreatedAt(ctx, index, since, limit)
+}
+
 // LoadEvaluablesSince calls PausesSince and implements the aggregate expression interface implementation
 // for grouping many pauses together.
 func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
@@ -322,7 +329,10 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 		return err
 	}
 
-	if m.bs == nil || !m.blockStoreEnabled(ctx, pause.WorkspaceID) {
+	// We check the block flushing feature flag because block store delete will only
+	// just mark pauses as deleted in Redis. Without compaction it won't really do
+	// anything.
+	if m.bs == nil || !m.blockFlushEnabled(ctx, pause.WorkspaceID) {
 		return nil
 	}
 

@@ -16,6 +16,7 @@ type Queue interface {
 	JobQueueReader
 	Migrator
 	Unpauser
+	AttemptResetter
 }
 
 type RunInfo struct {
@@ -89,6 +90,11 @@ type Migrator interface {
 
 type Unpauser interface {
 	UnpauseFunction(ctx context.Context, shard string, acctID, fnID uuid.UUID) error
+}
+
+// AttemptResetter resets queue item attempts after a successful checkpoint.
+type AttemptResetter interface {
+	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
 }
 
 type QueueDirectAccess interface {
@@ -197,7 +203,8 @@ type alwaysRetry struct {
 func (a alwaysRetry) AlwaysRetryable() {}
 
 func IsAlwaysRetryable(err error) bool {
-	return errors.Is(err, alwaysRetry{})
+	var ar alwaysRetry
+	return errors.As(err, &ar)
 }
 
 type JobResponse struct {
