@@ -11,8 +11,8 @@ builds:
     binary: inngest
     ldflags:
       - -s -w
-      - -X github.com/inngest/inngest/pkg/inngest/version.Version={{.Version}}
-      - -X github.com/inngest/inngest/pkg/inngest/version.Hash={{.ShortCommit}}
+      - -X github.com/jainhardik120/inngest/pkg/inngest/version.Version={{.Version}}
+      - -X github.com/jainhardik120/inngest/pkg/inngest/version.Hash={{.ShortCommit}}
     goos:
       - linux
       - windows
@@ -29,8 +29,8 @@ dockers:
     use: buildx
     dockerfile: 'Dockerfile.goreleaser'
     image_templates:
-    - "inngest/inngest:latest-amd64"
-    - "inngest/inngest:{{ .Tag }}-amd64"
+    - "jainhardik120/inngest:latest-amd64"
+    - "jainhardik120/inngest:{{ .Tag }}-amd64"
     build_flag_templates:
     - "--pull"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -45,8 +45,8 @@ dockers:
     use: buildx
     dockerfile: 'Dockerfile.goreleaser'
     image_templates:
-    - "inngest/inngest:latest-arm64v8"
-    - "inngest/inngest:{{ .Tag }}-arm64v8"
+    - "jainhardik120/inngest:latest-arm64v8"
+    - "jainhardik120/inngest:{{ .Tag }}-arm64v8"
     build_flag_templates:
     - "--pull"
     - "--label=org.opencontainers.image.created={{.Date}}"
@@ -55,14 +55,14 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
     - "--platform=linux/arm64"
 docker_manifests:
-  - name_template: inngest/inngest:latest
+  - name_template: jainhardik120/inngest:latest
     image_templates:
-      - inngest/inngest:latest-amd64
-      - inngest/inngest:latest-arm64v8
-  - name_template: inngest/inngest:{{ .Tag }}
+      - jainhardik120/inngest:latest-amd64
+      - jainhardik120/inngest:latest-arm64v8
+  - name_template: jainhardik120/inngest:{{ .Tag }}
     image_templates:
-      - inngest/inngest:{{ .Tag }}-amd64
-      - inngest/inngest:{{ .Tag }}-arm64v8
+      - jainhardik120/inngest:{{ .Tag }}-amd64
+      - jainhardik120/inngest:{{ .Tag }}-arm64v8
 
 archives:
   - format_overrides:
