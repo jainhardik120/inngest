@@ -1073,8 +1073,8 @@ SELECT
   run_id,
   debug_session_id,
   dynamic_span_id,
-  MIN(start_time) as start_time,
-  MAX(end_time) AS end_time,
+  to_char(MIN(start_time), 'YYYY-MM-DD HH24:MI:SS.USOF TZ') AS start_time,
+  to_char(MAX(end_time), 'YYYY-MM-DD HH24:MI:SS.USOF TZ') AS end_time,
   parent_span_id,
   json_agg(json_build_object(
     'span_id', span_id,
